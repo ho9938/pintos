@@ -359,6 +359,18 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
+/* Sets the current thread's ticks_to_awake to ticks. */
+void thread_set_ticks_to_awake (int64_t ticks)
+{
+	thread_current ()-> ticks_to_awake = ticks;
+}
+
+/* Returns the current thread's ticks_to_awake. */
+int64_t thread_get_ticks_to_awake (void)
+{
+	return thread_current ()->ticks_to_awake;
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) 

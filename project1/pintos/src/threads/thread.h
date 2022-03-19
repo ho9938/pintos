@@ -136,6 +136,9 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+int64_t thread_get_ticks_to_awake (void);
+void thread_set_ticks_to_awake (int64_t);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
