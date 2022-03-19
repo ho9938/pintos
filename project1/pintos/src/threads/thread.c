@@ -264,14 +264,14 @@ thread_unblock (struct thread *t)
 /* make threads sleep:
    set ticks_to_awake, upcoming_ticks_to_awake
    make thread block */
+/* ticks: # of ticks since OS booted */
 void
 thread_sleep (int64_t ticks)
 {
 	struct thread *cur = running_thread ();
-	int64_t ticks_to_awake = timer_ticks () + ticks;
 
-	if (ticks_to_awake < upcoming_ticks_to_awake)
-		upcoming_ticks_to_awake = ticks_to_awake;
+	if (ticks < upcoming_ticks_to_awake)
+		upcoming_ticks_to_awake = ticks;
 
 	list_push_back (&sleep_list, cur->elem);
 	thread_block ();
