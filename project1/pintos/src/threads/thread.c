@@ -26,7 +26,7 @@ static struct list ready_list;
 
 /* List of sleeping processes. They are in THREAD_BLOCKED,
    that is, processes that are waiting for timer interrupt. */
-static struct list sleep_list;
+static struct list blocked_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -95,7 +95,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
-  list_init (&sleep_list);
+  list_init (&blocked_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -255,6 +255,7 @@ thread_unblock (struct thread *t)
   intr_set_level (old_level);
 }
 
+
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -279,7 +280,7 @@ thread_current (void)
   ASSERT (t->status == THREAD_RUNNING);
 
   return t;
-}
+
 
 /* Returns the running thread's tid. */
 tid_t
