@@ -53,6 +53,7 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
+static int64_t upcoming_ticks_to_awake;  /* # of timer ticks to thread_awake runs. */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -142,6 +143,11 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+
+  /* awake sleeping threads.
+     invoke upcoming_ticks_to_awake for time saving */
+  if (timer_ticks () >= upcoming_ticks_to_awake)
+	  thread_awake ();
 }
 
 /* Prints thread statistics. */
@@ -255,6 +261,51 @@ thread_unblock (struct thread *t)
   intr_set_level (old_level);
 }
 
+/* make threads sleep:
+   set ticks_to_awake, upcoming_ticks_to_awake
+   make thread block */
+void
+thread_sleep (int64_t ticks)
+{
+	struct thread *cur = running_thread ();
+	int64_t ticks_to_awake = timer_ticks () + ticks;
+
+	if (ticks_to_awake < upcoming_ticks_to_awake)
+		upcoming_ticks_to_awake = ticks_to_awake;
+
+	list_push_back (&sleep_list, cur->elem);
+	thread_block ();
+}
+
+/* make threads awake:
+   unblock ready-to-awake thread
+   update upcoming_ticks_to_awake */
+void
+thread_awake (int64_t ticks_to_awake)
+{
+	struct list_elem *e;
+	enum intr_level old_level;
+
+	upcoming_ticks_to_awake = INT64_MAX;
+
+	old_level = intr_disable ();
+	for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
+		 e = list_next (e))
+	{
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (t->ticks_to_awake <= ticks_to_awake)
+		{
+			t->ticks_to_awake = INT64_MAX;
+			list_remove (e);
+			thread_unblock (t);
+		}
+		else if (t->ticks_to_awake < upcoming_ticks_to_awake)
+		{
+			upcoming_ticks_to_awake = ticks_to_awake;
+		}
+	}
+	intr_set_level (old_level);
+}
 
 /* Returns the name of the running thread. */
 const char *
