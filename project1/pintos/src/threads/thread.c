@@ -281,7 +281,7 @@ thread_sleep (int64_t ticks)
    unblock ready-to-awake thread
    update upcoming_ticks_to_awake */
 void
-thread_awake (int64_t ticks_to_awake)
+thread_awake (int64_t ticks)
 {
 	struct list_elem *e;
 	enum intr_level old_level;
@@ -293,7 +293,7 @@ thread_awake (int64_t ticks_to_awake)
 		 e = list_next (e))
 	{
 		struct thread *t = list_entry (e, struct thread, elem);
-		if (t->ticks_to_awake <= ticks_to_awake)
+		if (t->ticks_to_awake <= ticks)
 		{
 			t->ticks_to_awake = INT64_MAX;
 			list_remove (e);
@@ -301,7 +301,7 @@ thread_awake (int64_t ticks_to_awake)
 		}
 		else if (t->ticks_to_awake < upcoming_ticks_to_awake)
 		{
-			upcoming_ticks_to_awake = ticks_to_awake;
+			upcoming_ticks_to_awake = t->ticks_to_awake;
 		}
 	}
 	intr_set_level (old_level);
