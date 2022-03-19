@@ -143,11 +143,6 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-
-  /* awake sleeping threads.
-     invoke upcoming_ticks_to_awake for time saving */
-  if (timer_ticks () >= upcoming_ticks_to_awake)
-	  thread_awake ();
 }
 
 /* Prints thread statistics. */
@@ -411,15 +406,24 @@ thread_get_priority (void)
 }
 
 /* Sets the current thread's ticks_to_awake to ticks. */
-void thread_set_ticks_to_awake (int64_t ticks)
+void 
+thread_set_ticks_to_awake (int64_t ticks)
 {
 	thread_current ()-> ticks_to_awake = ticks;
 }
 
 /* Returns the current thread's ticks_to_awake. */
-int64_t thread_get_ticks_to_awake (void)
+int64_t 
+thread_get_ticks_to_awake (void)
 {
 	return thread_current ()->ticks_to_awake;
+}
+
+/* Returns upcoming_ticks_to_awake. */
+int64_t
+thread_get_upcoming_ticks_to_awake (void)
+{
+	return upcoming_ticks_to_awake;
 }
 
 /* Sets the current thread's nice value to NICE. */

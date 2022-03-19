@@ -141,6 +141,7 @@ void thread_set_priority (int);
 
 int64_t thread_get_ticks_to_awake (void);
 void thread_set_ticks_to_awake (int64_t);
+int64_t thread_get_upcoming_ticks_to_awake (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
