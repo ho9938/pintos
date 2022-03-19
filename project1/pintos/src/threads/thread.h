@@ -92,6 +92,9 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+	
+	/* Ticks to wake up, initialized to INT64_MAX */
+	int64_t ticks_to_awake; 
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
