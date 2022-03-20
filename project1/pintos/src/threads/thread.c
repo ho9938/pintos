@@ -268,7 +268,7 @@ thread_sleep (int64_t ticks)
 	if (ticks < upcoming_ticks_to_awake)
 		upcoming_ticks_to_awake = ticks;
 
-	list_push_back (&sleep_list, cur->elem);
+	list_push_back (&sleep_list, &cur->elem);
 	thread_block ();
 }
 
