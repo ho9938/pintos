@@ -173,9 +173,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
   /* awake sleeping threads.
      invoke upcoming_ticks_to_awake for time saving */
-  if (timer_ticks () >= thread_get_upcoming_ticks_to_awake ())
-	  thread_awake ();
-	}
+  if (ticks >= thread_get_upcoming_ticks_to_awake ())
+	  thread_awake (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
