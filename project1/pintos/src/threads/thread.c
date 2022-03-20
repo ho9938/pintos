@@ -326,7 +326,7 @@ thread_current (void)
   ASSERT (t->status == THREAD_RUNNING);
 
   return t;
-
+}
 
 /* Returns the running thread's tid. */
 tid_t
