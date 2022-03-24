@@ -53,7 +53,7 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-static int64_t upcoming_ticks_to_awake;  /* # of timer ticks to thread_awake runs. */
+static int64_t upcoming_ticks_to_awake;  /* # of timer ticks to thread_awake be called. */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -258,9 +258,12 @@ thread_unblock (struct thread *t)
 }
 
 /* make threads sleep:
-   set ticks_to_awake, upcoming_ticks_to_awake
-   make thread block */
-/* ticks: # of ticks since OS booted */
+   set ticks_to_awake
+   push into sleep_list
+   update upcoming_ticks_to_awake
+   make thread block
+
+   ticks: # of ticks since OS booted */
 void
 thread_sleep (int64_t ticks)
 {
@@ -278,7 +281,9 @@ thread_sleep (int64_t ticks)
 }
 
 /* make threads awake:
-   unblock ready-to-awake thread
+   reset ticks_to_awake of the thread
+   remove the thread from sleep_list
+   unblock the thread
    update upcoming_ticks_to_awake */
 void
 thread_awake (int64_t ticks)
