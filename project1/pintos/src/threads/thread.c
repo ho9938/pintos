@@ -97,6 +97,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&sleep_list);
+  upcoming_ticks_to_awake = INT64_MAX;
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -264,12 +265,16 @@ void
 thread_sleep (int64_t ticks)
 {
 	struct thread *cur = running_thread ();
+	enum intr_level old_level;
 
-	if (ticks < upcoming_ticks_to_awake)
+	old_level = intr_disable ();
+	cur->ticks_to_awake = ticks;
+	if (ticks < upcoming_ticks_to_awake) {
 		upcoming_ticks_to_awake = ticks;
-
+	}
 	list_push_back (&sleep_list, &cur->elem);
 	thread_block ();
+	intr_set_level (old_level);
 }
 
 /* make threads awake:
@@ -281,24 +286,27 @@ thread_awake (int64_t ticks)
 	struct list_elem *e;
 	enum intr_level old_level;
 
+	old_level = intr_disable ();
 	upcoming_ticks_to_awake = INT64_MAX;
 
-	old_level = intr_disable ();
-	for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
-		 e = list_next (e))
+	e = list_begin (&sleep_list);
+	while (e != list_end (&sleep_list))
 	{
 		struct thread *t = list_entry (e, struct thread, elem);
 		if (t->ticks_to_awake <= ticks)
 		{
 			t->ticks_to_awake = INT64_MAX;
-			list_remove (e);
+			e = list_remove (e);
 			thread_unblock (t);
 		}
-		else if (t->ticks_to_awake < upcoming_ticks_to_awake)
+		else
 		{
-			upcoming_ticks_to_awake = t->ticks_to_awake;
+			if (upcoming_ticks_to_awake > t->ticks_to_awake)
+				upcoming_ticks_to_awake = t->ticks_to_awake;
+			e = list_next (e);
 		}
 	}
+
 	intr_set_level (old_level);
 }
 
