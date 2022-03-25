@@ -584,9 +584,33 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+
+  /* else */
+  struct list_elem *e;
+  struct list_elem *elem_to_remove = NULL;
+  struct thread *t = NULL;
+  int highest_priority = PRI_MIN - 1;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&ready_list); e != list_end (&ready_list);
+		  e = list_next (e))
+  {
+	  t = list_entry (e, struct thread, elem);
+	  if (highest_priority < t->priority)
+	  {
+		  highest_priority = t->priority;
+		  elem_to_remove = e;
+	  }
+  }
+
+  ASSERT (elem_to_remove != NULL);
+
+  t = list_entry (elem_to_remove, struct thread, elem);
+  list_remove (elem_to_remove);
+  return t;
 }
+
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
