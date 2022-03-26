@@ -612,6 +612,7 @@ next_thread_to_run (void)
 
   t = list_entry (elem_to_remove, struct thread, elem);
   list_remove (elem_to_remove);
+
   return t;
 }
 
