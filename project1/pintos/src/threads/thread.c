@@ -215,7 +215,8 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   /* enable preemption */
-  thread_yield ();
+  if (priority > thread_get_priority ())
+  	thread_yield ();
 
   return tid;
 }
