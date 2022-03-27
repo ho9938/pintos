@@ -8,9 +8,7 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Changho Yoon <ho9938@unist.ac.kr>
 
 ---- PRELIMINARIES ----
 
@@ -30,13 +28,48 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+Added to threads/thread.h/struct thread:
+
+	/* Ticks to wake up, initialized to INT64_MAX */
+	int64_t ticks_to_awake; 
+
+Added to threads/thread.c:
+
+	/* List of processes in THREAD_READY state, that is, processes
+       that are ready to run but not actually running. */
+	static struct list ready_list;
+
+	static int64_t upcoming_ticks_to_awake;  /* # of timer ticks to thread_awake be called. */
+
+	/* Sets the current thread's ticks_to_awake to ticks. */
+	void thread_set_ticks_to_awake (int64_t ticks)
+
+	/* Returns the current thread's ticks_to_awake. */
+	int64_t thread_get_ticks_to_awake (void)
+
+	/* Returns upcoming_ticks_to_awake. */
+	int64_t thread_get_upcoming_ticks_to_awake (void)
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+1. timer_sleep()
+1-1. call thread_sleep() with "current ticks + additional ticks".
+2. thread_sleep()
+2-1. set ticks_to_awake of thread.
+2-2. update upcoming_ticks_to_awake.
+2-3. push thread into sleep_list.
+2-4. block thread by calling thread_block().
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+To minimize time, upcoming_ticks_to_awake is added to thread.c.
+This static variable indicates when to thread_awake() be called,
+So unnecessary calls of thread_awake() are eliminated.
+This variable is updated when timer_sleep(), timer_awake() are called.
 
 ---- SYNCHRONIZATION ----
 
@@ -51,6 +84,9 @@ FirstName LastName <email@domain.example>
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
 
+This sleep-and-awake design prevents busy-waiting of sleeping thread,
+so that CPU can be used for non-blocked threads.
+
        PRIORITY SCHEDULING
        ===================
 
@@ -59,6 +95,22 @@ FirstName LastName <email@domain.example>
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
+no changed declaration.
+
+I just reimpelmented such functions:
+
+/* removed codes for RR scheduler */
+void thread_tick (void) 
+	
+/* changed method for select next_thread according to the priority. */
+static struct thread *next_thread_to_run (void) 
+
+/* added thread_yield () in the last portion of function,
+   so that preemption could occur immediately. */
+void thread_set_priority (int new_priority) 
+tid_t thread_create (const char *name, int priority,
+		               thread_func *function, void *aux) 
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
@@ -85,6 +137,10 @@ FirstName LastName <email@domain.example>
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+There is one more design to make priority scheduler, that is
+making ready_list ordered. My design is simpler to implement
+because I need to reimplement next_thread_to_run() only. So I chose it.
 
         ADVANCED SCHEDULER
         ==================
