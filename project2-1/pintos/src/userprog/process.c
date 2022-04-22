@@ -54,6 +54,17 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  /* argument parsing */
+  int argc = 0;
+  char *argv[512];
+  char *token, *save_ptr;
+
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+	   token = strtok_r (NULL, " ", &save_ptr))
+  {
+	  argv[argc++] = token;
+  }
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
