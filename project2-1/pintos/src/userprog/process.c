@@ -72,6 +72,8 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  push_argument (argc, argv, &if_.esp);
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -473,4 +475,44 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+void
+push_argument (int argc, char **argv, void **esp_ptr)
+{
+	char *argv_in_stack[512];
+	int index;
+
+	for (index = argc - 1; index >= 0; index--)
+	{
+		char *token = argv[index];
+		size_t token_len = strlen (token) + 1; // including '\0'
+		*esp_ptr -= token_len;
+		memcpy (*esp_ptr, token, token_len);
+		argv_in_stack[index] = *esp_ptr;
+	}
+	
+	while ((uintptr_t)*esp_ptr % 4 != 0)
+	{
+		*esp_ptr -= 1;
+		**(uint8_t **)esp_ptr = 0;
+	}
+
+	for (index = argc; index >= 0; index--)
+	{
+		*esp_ptr -= 4;
+		if (index == argc)
+			**(char ***)esp_ptr = 0;
+		else
+			**(char ***)esp_ptr = argv_in_stack[index];
+	}
+
+	*esp_ptr -= 4;
+	**(char ****)esp_ptr = *esp_ptr + 4;
+
+	*esp_ptr -= 4;
+	**(int **)esp_ptr = argc;
+
+	*esp_ptr -= 4;
+	memset (*esp_ptr, 0, 4);
 }
