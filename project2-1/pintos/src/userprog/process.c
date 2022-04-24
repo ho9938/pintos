@@ -60,7 +60,7 @@ start_process (void *file_name_)
 
   /* argument parsing */
   int argc = 0;
-  char *argv[512];
+  char *argv[128];
   char *token, *save_ptr;
 
   for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
@@ -485,24 +485,27 @@ install_page (void *upage, void *kpage, bool writable)
 void
 push_argument (int argc, char **argv, void **esp_ptr)
 {
-	char *argv_in_stack[512];
+	char *argv_in_stack[128];
 	int index;
 
+	/* push words */
 	for (index = argc - 1; index >= 0; index--)
 	{
 		char *token = argv[index];
-		size_t token_len = strlen (token) + 1; // including '\0'
+		size_t token_len = strlen (token) + 1; /* including '\0' */
 		*esp_ptr -= token_len;
 		memcpy (*esp_ptr, token, token_len);
 		argv_in_stack[index] = *esp_ptr;
 	}
 	
+	/* word-align */
 	while ((uintptr_t)*esp_ptr % 4 != 0)
 	{
 		*esp_ptr -= 1;
 		**(uint8_t **)esp_ptr = 0;
 	}
 
+	/* push arguments */
 	for (index = argc; index >= 0; index--)
 	{
 		*esp_ptr -= 4;
@@ -512,12 +515,15 @@ push_argument (int argc, char **argv, void **esp_ptr)
 			**(char ***)esp_ptr = argv_in_stack[index];
 	}
 
+	/* push argv */
 	*esp_ptr -= 4;
 	**(char ****)esp_ptr = *esp_ptr + 4;
 
+	/* push argc */
 	*esp_ptr -= 4;
 	**(int **)esp_ptr = argc;
 
+	/* push fake address */
 	*esp_ptr -= 4;
 	memset (*esp_ptr, 0, 4);
 }
