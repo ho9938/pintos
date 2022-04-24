@@ -204,6 +204,12 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+#ifdef USERPROG
+  /* Initialize file descriptor table */
+  int index;
+  for (index = 0; index < FDT_SIZE; index ++)
+	  t->fdt[index] = NULL;
+#endif
   intr_set_level (old_level);
 
   /* Add to run queue. */
