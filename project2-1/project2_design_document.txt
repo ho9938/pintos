@@ -8,8 +8,7 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Changho Yoon <ho9938@unist.ac.kr>
 
 ---- PRELIMINARIES ----
 
@@ -29,19 +28,33 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+/* Push argv into user stack */
+void push_argument (int argc, char **argv, void **esp_ptr)
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+Similar to the push instruction in assembly.
+Subtract the value of esp and put data in *esp.
+Implemented it according to the 80x86 calling convention.
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
+Because strtok() is problematic in multi-threading.
+strtok() uses static variable as saving pointer,
+So the race condition can be raised.
+
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
+Can simplify the kernel functionality.
+Can make commands in various way, depending on the shell.
 
            SYSTEM CALLS
            ============
@@ -52,9 +65,24 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+in struct thread:
+#ifdef USERPROG
+struct file *fdt[FDT_SIZE];         /* File descriptor table */
+#endif
+
+/* Check the validity of address */
+static void check_address (void *addr)
+
+/* Get INDEXth argument from intr_frame */
+static int get_arg (struct intr_frame *f, int index)
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+File descriptors are unique within a single process.
+Each user process has its own file descriptor table.
+Open files are contained in it with file descritpor as its index.
 
 ---- ALGORITHMS ----
 
