@@ -172,34 +172,35 @@ write (int fd, const void *buffer, unsigned length)
 
 /* Change position in a file. */
 void 
-seek (int fd UNUSED, unsigned position UNUSED)
+seek (int fd, unsigned position)
 {
-  return;
+  struct file *target_file = get_file (fd);
+  if (target_file == NULL)
+	  return;
+
+  file_seek (target_file, (off_t) position);
 }
 
 /* Report current position in a file. */
 unsigned 
-tell (int fd UNUSED)
+tell (int fd)
 {
-  return -1;
+  struct file *target_file = get_file (fd);
+  if (target_file == NULL)
+	  return -1;
+
+  return (unsigned) file_tell (target_file);
 }
 
 /* Close a file. */
 void 
 close (int fd)
 {
-  /* Invalid fd */
-  if (fd < 0 || fd >= FDT_SIZE)
+  struct file *target_file = get_file (fd);
+  if (target_file == NULL)
 	  return;
 
-  struct file *file_to_close;
-  file_to_close = thread_current()->fdt[fd];
-
-  /* Already closed file */
-  if (file_to_close == NULL)
-	  return;
-
-  file_close (file_to_close);
+  file_close (target_file);
   thread_current()->fdt[fd] = NULL;
 }
 
