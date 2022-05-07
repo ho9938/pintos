@@ -114,7 +114,7 @@ int
 remove (const char *file)
 {
   check_address ((void *) file);
-  return 0;
+  return (int) filesys_remove (file);
 }
 
 /* Open a file. */
