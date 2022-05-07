@@ -9,14 +9,19 @@
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "devices/input.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
 static void check_address (void *addr);
 static int get_arg (struct intr_frame *f, int index);
+static struct file *get_file (int fd);
+struct lock filesys_lock;
 
 void
 syscall_init (void) 
 {
+  lock_init (&filesys_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
