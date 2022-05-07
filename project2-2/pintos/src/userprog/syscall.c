@@ -150,16 +150,42 @@ open (const char *file)
 
 /* Obtain a file's size. */
 int 
-filesize (int fd UNUSED)
+filesize (int fd)
 {
-  return -1;
+  struct file *target_file = get_file (fd);
+  if (!target_file)
+	  return -1;
+
+  return (int) file_length (target_file);
 }
 
 /* Read from a file. */
 int 
-read (int fd UNUSED, void *buffer UNUSED, unsigned length UNUSED)
+read (int fd, void *buffer, unsigned length)
 {
-  return -1;
+  check_address ((void *) buffer);
+
+  int read_size = 0;
+  char key;
+
+  if (fd == 0) { /* STDIN_FILENO */
+	  do {
+		  key = input_getc ();
+	  } while (key != '\0' && ++read_size < (int) length);
+  }
+  else if (fd == 1) /* STDOUT_FILENO */
+	  return -1;
+  else {
+	  struct file *target_file = get_file (fd);
+	  if (!target_file)
+		  return -1;
+
+	  lock_acquire (&filesys_lock);
+	  read_size = (int) file_read (target_file, buffer, (off_t) length);
+	  lock_release (&filesys_lock);
+  }
+
+  return read_size;
 }
 
 /* Write to a file. */
@@ -168,11 +194,26 @@ write (int fd, const void *buffer, unsigned length)
 {
   check_address ((void *) buffer);
 
-  /* STDOUT_FILENO */
-  if (fd == 1)
-	  putbuf (buffer, length);
+  int write_size = 0;
 
-  return length;
+  /* STDOUT_FILENO */
+  if (fd == 1) {
+	  putbuf (buffer, length);
+	  write_size = length;
+  }
+  else if (fd == 0)
+	  return -1;
+  else {
+	  struct file *target_file = get_file (fd);
+	  if (!target_file)
+		  return -1;
+
+	  lock_acquire (&filesys_lock);
+	  write_size = (int) file_write (target_file, buffer, (off_t) length);
+	  lock_release (&filesys_lock);
+  }
+
+  return write_size;
 }
 
 /* Change position in a file. */
