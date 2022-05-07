@@ -223,3 +223,13 @@ get_arg (struct intr_frame *f, int index)
 	check_address ((void *) arg_ptr);
 	return *arg_ptr;
 }
+
+/* get file from fd, return NULL if failed */
+static struct file *
+get_file (int fd)
+{
+  if (fd < 0 || fd >= FDT_SIZE)
+	  return NULL;
+
+  return thread_current()->fdt[fd];
+}
