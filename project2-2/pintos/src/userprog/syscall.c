@@ -11,6 +11,7 @@
 #include "filesys/file.h"
 #include "devices/input.h"
 #include "threads/synch.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 static void check_address (void *addr);
@@ -96,7 +97,7 @@ pid_t
 exec (const char *file)
 {
   check_address ((void *) file);
-  return -1;
+  return process_execute (file);
 }
 
 /* Wait for a child process to die. */
