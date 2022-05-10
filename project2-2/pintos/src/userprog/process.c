@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static struct thread *child_thread (tid_t tid);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -529,4 +530,22 @@ push_argument (int argc, char **argv, void **esp_ptr)
 	/* push fake address */
 	*esp_ptr -= 4;
 	memset (*esp_ptr, 0, 4);
+}
+
+/* return child thread discriptor with tid */
+static struct thread *
+child_thread (tid_t tid)
+{
+	struct list child_list = thread_current ()->child_list;
+	struct list_elem *e;
+
+	for (e = list_begin (&child_list); e != list_end (&child_list);
+		 e = list_next (e))
+	{
+		struct thread *t = list_entry (e, struct thread, child_elem);
+		if (t->tid == tid)
+			return t;
+	}
+
+	return NULL;
 }
