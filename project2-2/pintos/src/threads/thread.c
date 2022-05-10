@@ -204,12 +204,6 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-#ifdef USERPROG
-  /* Initialize file descriptor table */
-  int index;
-  for (index = 0; index < FDT_SIZE; index ++)
-	  t->fdt[index] = NULL;
-#endif
   intr_set_level (old_level);
 
   /* Add to run queue. */
@@ -476,6 +470,21 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+#ifdef USERPROG
+  int index;
+  for (index = 0; index < FDT_SIZE; index ++)
+	t->fdt[index] = NULL;
+
+  if (t != initial_thread)
+	t->parent_thread = thread_current ();
+  else
+	t->parent_thread = NULL;
+
+  list_init (&t->child_list);
+  sema_init (&t->load_sema, 0);
+  sema_init (&t->exit_sema, 0);
+#endif
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
