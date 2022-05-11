@@ -103,9 +103,9 @@ exec (const char *file)
 
 /* Wait for a child process to die. */
 int
-wait (pid_t pid UNUSED)
+wait (pid_t pid)
 {
-  return -1;
+  return process_wait (pid);
 }
 
 /* Create a file. */
