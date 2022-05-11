@@ -99,7 +99,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
+	thread_exit ();
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -163,8 +163,12 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
-  if (cur->load_file)
-	file_close (cur->load_file);
+  /* Close related files */
+  int index;
+  for (index = 0; index < FDT_SIZE; index++)
+	file_close(cur->fdt[index]);
+  file_close (cur->load_file);
+
   sema_up (&cur->wait_sema);
 }
 
