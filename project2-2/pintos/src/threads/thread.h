@@ -26,7 +26,7 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* File descriptor table */
-#define FDT_SIZE 128
+#define FDT_SIZE 64
 
 /* A kernel thread or user process.
 
