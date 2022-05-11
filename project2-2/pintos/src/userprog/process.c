@@ -551,10 +551,10 @@ push_argument (int argc, char **argv, void **esp_ptr)
 static struct thread *
 child_thread (tid_t tid)
 {
-	struct list child_list = thread_current ()->child_list;
+	struct list *child_list = &thread_current ()->child_list;
 	struct list_elem *e;
 
-	for (e = list_begin (&child_list); e != list_end (&child_list);
+	for (e = list_begin (child_list); e != list_end (child_list);
 		 e = list_next (e))
 	{
 		struct thread *t = list_entry (e, struct thread, child_elem);
