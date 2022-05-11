@@ -17,7 +17,6 @@ static void syscall_handler (struct intr_frame *);
 static void check_address (void *addr);
 static int get_arg (struct intr_frame *f, int index);
 static struct file *get_file (int fd);
-struct lock filesys_lock;
 
 void
 syscall_init (void) 
