@@ -52,7 +52,8 @@ process_execute (const char *file_name)
 	sema_down (&thread_current ()->load_sema);
 	if (!child_thread (tid))
 		return -1;
-	sema_up (&child_thread (tid)->exit_sema);
+	if (child_thread (tid)->load_status == -1)
+		return -1;
   }
 	
   return tid;
@@ -85,10 +86,12 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  struct thread *parent = thread_current ()->parent_thread;
+  struct thread *cur = thread_current ();
+  struct thread *parent = cur->parent_thread;
+  list_push_back (&parent->child_list, &cur->child_elem);
   if (success) {
 	push_argument (argc, argv, &if_.esp);
-   	list_push_back (&parent->child_list, &thread_current ()->child_elem);
+	cur->load_status = 0;
   }
   sema_up (&parent->load_sema);
 
@@ -132,8 +135,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
-  sema_down (&cur->exit_sema);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

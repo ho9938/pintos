@@ -105,7 +105,9 @@ struct thread
 	struct list child_list;				/* Child thread list */
 	struct list_elem child_elem;		/* List element for child thread list */
 	struct semaphore load_sema;			/* Semaphore for load of child */
-	struct semaphore exit_sema;			/* Semaphore for exit of child */
+	struct semaphore wait_sema;			/* Semaphore for wait system call */
+	int load_status;					/* Success flag of load */
+	int exit_status;					/* Exit status */
 #endif
 
     /* Owned by thread.c. */
