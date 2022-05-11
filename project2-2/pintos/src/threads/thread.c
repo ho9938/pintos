@@ -477,7 +477,7 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->fdt[index] = NULL;
 
   if (t != initial_thread)
-	t->parent_thread = thread_current ();
+	t->parent_thread = running_thread ();
   else
 	t->parent_thread = NULL;
 
