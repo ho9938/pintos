@@ -120,13 +120,22 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  /* Temporarily make finite loop */
-  int i;
-  for (i=0; i<10000000; i++);
+  struct thread *child = child_thread (child_tid);
+  int exit_status;
 
-  return -1;
+  /* Not direct child or already called wait */
+  if (!child)
+	  return -1;
+
+  sema_down (&child->wait_sema);
+
+  exit_status = child->exit_status;
+  list_remove (&child->child_elem);
+  palloc_free_page (child);
+
+  return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -152,6 +161,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  sema_up (&cur->wait_sema);
 }
 
 /* Sets up the CPU for running user code in the current

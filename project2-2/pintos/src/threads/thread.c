@@ -559,7 +559,9 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
+#ifndef USERPROG
       palloc_free_page (prev);
+#endif
     }
 }
 
