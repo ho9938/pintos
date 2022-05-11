@@ -487,6 +487,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->load_status = -1;
   t->exit_status = -1;
+  t->load_file = NULL;
 #endif
 }
 

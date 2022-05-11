@@ -108,6 +108,7 @@ struct thread
 	struct semaphore wait_sema;			/* Semaphore for wait system call */
 	int load_status;					/* Success flag of load */
 	int exit_status;					/* Exit status */
+	struct file *load_file;				/* File to load */
 #endif
 
     /* Owned by thread.c. */
