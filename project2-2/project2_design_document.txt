@@ -67,7 +67,15 @@ Can make commands in various way, depending on the shell.
 
 in struct thread:
 #ifdef USERPROG
-struct file *fdt[FDT_SIZE];         /* File descriptor table */
+	struct file *fdt[FDT_SIZE];         /* File descriptor table */
+	struct thread *parent_thread;       /* Parent thread discriptor */
+	struct list child_list;             /* Child thread list */
+	struct list_elem child_elem;        /* List element for child thread list */
+	struct semaphore load_sema;         /* Semaphore for load of child */
+	struct semaphore wait_sema;         /* Semaphore for wait system call */
+	int load_status;                    /* Load status */
+	int exit_status;                    /* Exit status */
+	struct file *load_file;             /* File discriptor for loaded file */
 #endif
 
 /* Check the validity of address */
@@ -75,6 +83,15 @@ static void check_address (void *addr)
 
 /* Get INDEXth argument from intr_frame */
 static int get_arg (struct intr_frame *f, int index)
+
+/* return child thread discriptor with tid */
+static struct thread *child_thread (tid_t tid)
+
+/* Lock for file system synchronization */
+struct lock filesys_lock;
+
+/* get file from fd, return NULL if failed */
+static struct file *get_file (int fd)
 
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
@@ -89,6 +106,11 @@ Open files are contained in it with file descritpor as its index.
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
 
+User program calls read(), write() system call to read/write. Then
+kernel handles these system calls with procedures to control file system.
+When it read/write, it acquires filesys_lock to prevent access of file
+system by another process, so that synchronization can be established.
+
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
 >> and the greatest possible number of inspections of the page table
@@ -96,8 +118,17 @@ Open files are contained in it with file descritpor as its index.
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
+In both cases, the least/greatest number of inspection is 1 and 2,
+respectively. In latter case, it the greatest number of inspection
+could be 1 if data is aligned.
+
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+It works with wait_sema in child thread structure. When parent process
+call wait(), it waits for wait_sema by calling sema_down(). And child
+process signals to wait_sema by calling sema_up(), at the end of
+process_exit(). Then wait() of parent process can return.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -113,12 +144,23 @@ Open files are contained in it with file descritpor as its index.
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+I checked every address of memory before reference it with
+check_address(). It checks if address is NULL, or outside of user space,
+or not allocated, and if address is invalid, call exit(), so that process
+can terminate safely, without memory leak.
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
+
+It is done with load_sema and load_status field in child thread structure.
+Parent process waits for load_sema after create new thread for child process.
+After child process success/fail loading, it sets load_status and signals
+to load_sema. Then parent process can resume and return with load_status
+of child process.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -127,16 +169,33 @@ Open files are contained in it with file descritpor as its index.
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+It doesn't matter even if P calls wait(C) after C have been terminated,
+because thread structure of C is remaining even after C exits. Instead,
+thread structure disappears after P calls wait(C) once, so that resources
+are freed. If P terminates without wait(C), C remains until Pintos
+terminates.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+I checked every address before refrence it, because it is the most safe
+and simple way to handle this issue.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+In my design, file descriptors are inside the file desriptor table in
+thread structure, as the form of array. Advantage is that it is easy to
+implement, and disadvantage is that there is limitation in the number
+of file descriptors.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+I didn't change it. But if I use another mapping for them, it would be
+advantageous to distinguish whether it is kernel thread or user process.
 
          SURVEY QUESTIONS
          ================
