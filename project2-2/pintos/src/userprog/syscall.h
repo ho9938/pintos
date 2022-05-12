@@ -19,6 +19,7 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 
+/* Lock for file system synchronization */
 struct lock filesys_lock;
 
 #endif /* userprog/syscall.h */
