@@ -13,6 +13,8 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "vm/page.h"
+#include "vm/frame.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -298,9 +300,11 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+  struct thread *cur = thread_current ();
   intr_disable ();
-  list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  list_remove (&cur->allelem);
+  vm_spt_destroy (&cur->spt);
+  cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -489,6 +493,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_status = -1;
   t->exit_status = -1;
   t->load_file = NULL;
+
+  if (t != initial_thread)
+  	vm_spt_init (&t->spt);
 #endif
 }
 
