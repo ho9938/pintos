@@ -459,31 +459,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-	  struct frame *kframe = vm_get_frame ();
-      uint8_t *kpage = kframe->address;
-      if (kpage == NULL)
-        return false;
+	  struct page *page = vm_get_page (upage);
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          vm_free_frame (kframe);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+	  // printf("--------------------load_segment(): %x\n", upage);
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          vm_free_frame (kframe);
-          return false; 
-        }
+	  page->file = file;
+	  page->ofs = ofs;
+	  page->read_bytes = page_read_bytes;
+	  page->zero_bytes = page_zero_bytes;
+	  page->writable = writable;
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+	  ofs += PGSIZE;
     }
   return true;
 }
@@ -494,16 +484,24 @@ static bool
 setup_stack (void **esp) 
 {
   struct frame *kframe;
-  uint8_t *kpage;
+  uint8_t *kpage, *upage;
   bool success = false;
 
   kframe = vm_get_frame ();
   kpage = kframe->address;
+  upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      success = install_page (upage, kpage, true);
+      if (success) {
         *esp = PHYS_BASE;
+		
+	    struct page *page = vm_get_page (upage);
+
+	  // printf("--------------------setup_stack(): %x\n", upage);
+	  // printf("--------------------PGSIZE: %x\n", PGSIZE);
+	    page->frame = kframe;
+	  }
       else
         vm_free_frame (kframe);
     }
