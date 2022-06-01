@@ -12,6 +12,7 @@ struct frame
 
 struct frame *vm_get_frame (void);
 void vm_free_frame (struct frame *);
-void vm_init_ft (void);
+
+void vm_ft_init (void);
 
 #endif /* vm/frame.h */
