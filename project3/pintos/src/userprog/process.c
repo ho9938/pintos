@@ -19,10 +19,12 @@
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static struct thread *child_thread (tid_t tid);
+static bool load_page (struct frame *frame, struct page *page);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -450,7 +452,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -574,6 +575,26 @@ push_argument (int argc, char **argv, void **esp_ptr)
 	memset (*esp_ptr, 0, 4);
 }
 
+bool 
+process_page_fault (struct page *page)
+{
+	// printf ("-------------before process_page_fault()\n");
+	struct frame *frame = vm_get_frame ();
+
+	if (!frame)
+		return false;
+
+	page->frame = frame;
+	frame->page = page;
+
+	if (!load_page (frame, page)) {
+		vm_free_frame (frame);
+		return false;
+	}
+
+	return true;
+}
+
 /* return child thread discriptor with tid */
 static struct thread *
 child_thread (tid_t tid)
@@ -590,4 +611,32 @@ child_thread (tid_t tid)
 	}
 
 	return NULL;
+}
+
+static bool
+load_page (struct frame *frame, struct page *page)
+{
+	// printf ("-------------load_page()\n");
+  struct file *file = page->file;
+  off_t ofs = page->ofs;
+  void *upage = page->address;
+  uint32_t read_bytes = page->read_bytes;
+  uint32_t zero_bytes = page->zero_bytes;
+  bool writable = page->writable;
+
+  ASSERT (read_bytes + zero_bytes == PGSIZE);
+  ASSERT (pg_ofs (upage) == 0);
+  ASSERT (ofs % PGSIZE == 0);
+
+  file_seek (file, ofs);
+  void *kpage = frame->address;
+
+  if (file_read (file, kpage, read_bytes) != (int) read_bytes)
+  	return false;
+
+  memset (kpage + read_bytes, 0, zero_bytes);
+  if (!install_page (upage, kpage, writable))
+  	return false;
+
+  return true;
 }
