@@ -70,7 +70,7 @@ syscall_handler (struct intr_frame *f)
 			close (get_arg (f, 1));
 			break;
 		default:
-			exit(-1);
+			exit (-4);
 			break;
 	}
 }
@@ -255,12 +255,13 @@ close (int fd)
 static void
 check_address (void *addr)
 {
-  /* Null, not in user space, not allocated */
-  if (addr == NULL || !is_user_vaddr (addr) ||
-		  pagedir_get_page (thread_current()->pagedir, addr) == NULL)
-  {
-	  exit(-1);
-  }
+  /* Null, not in user space */
+  if (addr == NULL || !is_user_vaddr (addr))
+	  exit(-2);
+  
+  /* Not allocated */
+  if (vm_spt_find (&thread_current ()->spt, addr) == NULL)
+	  exit(-3);
 }
 
 /* Get INDEXth argument from intr_frame */
