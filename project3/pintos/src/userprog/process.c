@@ -24,7 +24,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static struct thread *child_thread (tid_t tid);
-static bool load_page (struct frame *frame, struct page *page);
+static bool load_page (struct page *page, bool write);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -464,6 +464,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 	  struct page *page = vm_get_page (upage);
+	  page->mapping = -1;
 
 	  // printf("--------------------load_segment(): %x\n", upage);
 
@@ -590,7 +591,7 @@ process_page_fault (struct page *page)
 	page->frame = frame;
 	frame->page = page;
 
-	if (!load_page (frame, page)) {
+	if (!load_page (page, false)) {
 		vm_free_frame (frame);
 		return false;
 	}
@@ -617,7 +618,7 @@ child_thread (tid_t tid)
 }
 
 static bool
-load_page (struct frame *frame, struct page *page)
+load_page (struct page *page, bool write)
 {
 	// printf ("-------------load_page()\n");
   struct file *file = page->file;
@@ -630,16 +631,79 @@ load_page (struct frame *frame, struct page *page)
   ASSERT (read_bytes + zero_bytes == PGSIZE);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
+  ASSERT (page->frame != NULL);
 
-  file_seek (file, ofs);
-  void *kpage = frame->address;
+  void *kpage = page->frame->address;
 
-  if (file_read (file, kpage, read_bytes) != (int) read_bytes)
-  	return false;
+  if (write) {
+	  // lock_acquire (&filesys_lock);
+	  int tmp = file_write_at (file, kpage, read_bytes, ofs);
+	  // lock_release (&filesys_lock);
 
-  memset (kpage + read_bytes, 0, zero_bytes);
-  if (!install_page (upage, kpage, writable))
-  	return false;
+	  if (tmp != (int) read_bytes)
+		  return false;
+  } else {
+	  // lock_acquire (&filesys_lock);
+	  int tmp = file_read_at (file, kpage, read_bytes, ofs);
+	  // lock_release (&filesys_lock);
+
+	  if (tmp != (int) read_bytes)
+		return false;
+
+	  memset (kpage + read_bytes, 0, zero_bytes);
+	  if (!install_page (upage, kpage, writable))
+		return false;
+  }
 
   return true;
+}
+
+int
+process_mmap (struct file *file, void *address)
+{
+	int mapping = (thread_current ()->mapping)++;
+	off_t ofs = 0;
+	off_t read_bytes = file_length (file);
+
+	while (read_bytes > 0) {
+		off_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+		off_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+		struct page *page = vm_get_mmap (address);
+		if (!page) {
+			process_munmap (mapping);
+			return -1;
+		}
+
+		page->mapping = mapping;
+
+		page->file = file;
+		page->ofs = ofs;
+		page->read_bytes = page_read_bytes;
+		page->zero_bytes = page_zero_bytes;
+
+		read_bytes -= page_read_bytes;
+		address += PGSIZE;
+		ofs += PGSIZE;
+
+		if (!process_page_fault (page)) {
+			process_munmap (mapping);
+			return -1;
+		}
+	}
+
+	return mapping;
+}
+
+void process_munmap (int mapping)
+{
+	uint32_t *pd = thread_current ()->pagedir;
+	struct page *p = vm_find_mmap (mapping);
+	while (p != NULL) {
+		if (pagedir_is_dirty (pd, p->address))
+			load_page (p, true);
+		pagedir_clear_page (pd, p->address);
+		vm_free_mmap (p);
+		p = vm_find_mmap (mapping);
+	}
 }

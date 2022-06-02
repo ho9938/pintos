@@ -158,7 +158,7 @@ page_fault (struct intr_frame *f)
 
   struct page *page = vm_spt_find (&thread_current ()->spt, fault_addr);
   if (!page)
-	  exit (-5);
+	  exit (-1);
 
   process_page_fault (page);
 }
