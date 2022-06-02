@@ -112,6 +112,8 @@ struct thread
 	struct file *load_file;				/* File discriptor for loaded file */
 
 	struct hash spt;					/* Supplemental page table */
+	struct list mml;					/* memory mapped list */
+	int mapping;						/* latedst mapping */
 #endif
 
     /* Owned by thread.c. */

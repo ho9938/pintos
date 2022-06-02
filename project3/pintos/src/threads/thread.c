@@ -300,10 +300,9 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  struct thread *cur = thread_current ();
   intr_disable ();
+  struct thread *cur = thread_current ();
   list_remove (&cur->allelem);
-  vm_spt_destroy (&cur->spt);
   cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -496,6 +495,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
   if (t != initial_thread)
   	vm_spt_init (&t->spt);
+
+  vm_mml_init (&t->mml);
+  t->mapping = 0;
 #endif
 }
 
