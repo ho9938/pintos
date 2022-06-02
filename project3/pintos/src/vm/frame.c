@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include <list.h>
 #include <debug.h>
+#include "vm/page.h"
 
 static struct list frame_table;
 
@@ -12,6 +13,7 @@ vm_get_frame (void)
 	struct frame *frame = (struct frame *) malloc (sizeof (struct frame));
 
 	void *address = palloc_get_page (PAL_USER | PAL_ZERO);
+	// printf ("-------------------vm_get_frame (): %x\n", address);
 	if (!address) {
 		// printf ("------------------------palloc failed\n");
 		ASSERT (false);
@@ -30,8 +32,11 @@ vm_free_frame (struct frame *frame)
 {
 	ASSERT (frame);
 
+	// printf ("----------------before vm_free_frame\n");
 	palloc_free_page (frame->address);
+	// printf ("----------------after vm_free_frame\n");
 	list_remove (&frame->ftelem);
+	frame->page->frame = NULL;
 	free (frame);
 }
 
