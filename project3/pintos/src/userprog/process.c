@@ -466,8 +466,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	  struct page *page = vm_get_page (upage);
 	  page->mapping = -1;
 
-	  // printf("--------------------load_segment(): %x\n", upage);
-
 	  page->file = file;
 	  page->ofs = ofs;
 	  page->read_bytes = page_read_bytes;
@@ -492,24 +490,25 @@ setup_stack (void **esp)
   uint8_t *kpage, *upage;
   bool success = false;
 
-  kframe = vm_get_frame ();
-  kpage = kframe->address;
   upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  if (kpage != NULL) 
-    {
-      success = install_page (upage, kpage, true);
-      if (success) {
-        *esp = PHYS_BASE;
-		
-	    struct page *page = vm_get_page (upage);
+  struct page *page = vm_get_page (upage);
+  
+  struct frame *frame = vm_get_frame (page);
+  if (frame == NULL) {
+	  vm_free_page (page);
+	  return false;
+  }
+  kpage = frame->address;
 
-	  // printf("--------------------setup_stack(): %x\n", upage);
-	  // printf("--------------------PGSIZE: %x\n", PGSIZE);
-	    page->frame = kframe;
-	  }
-      else
-        vm_free_frame (kframe);
-    }
+  success = install_page (upage, kpage, true);
+  if (success)
+	*esp = PHYS_BASE;
+  else {
+	  vm_free_page (page);
+	  vm_free_frame (frame);
+	  return false;
+  }
+
   return success;
 }
 
@@ -582,14 +581,20 @@ push_argument (int argc, char **argv, void **esp_ptr)
 bool 
 process_page_fault (struct page *page)
 {
-	// printf ("-------------before process_page_fault()\n");
-	struct frame *frame = vm_get_frame ();
+	
+	/* frame swapped out */
+	if (page->frame != NULL) {
+		vm_swap_out (vm_ft_victim ());
+		return vm_swap_in (page->frame);
+	}
+
+	/* new frame needed */
+	struct frame *frame = vm_get_frame (page);
 
 	if (!frame)
 		return false;
 
 	page->frame = frame;
-	frame->page = page;
 
 	if (!load_page (page, false)) {
 		vm_free_frame (frame);
@@ -620,7 +625,6 @@ child_thread (tid_t tid)
 static bool
 load_page (struct page *page, bool write)
 {
-	// printf ("-------------load_page()\n");
   struct file *file = page->file;
   off_t ofs = page->ofs;
   void *upage = page->address;
@@ -628,7 +632,7 @@ load_page (struct page *page, bool write)
   uint32_t zero_bytes = page->zero_bytes;
   bool writable = page->writable;
 
-  ASSERT (read_bytes + zero_bytes == PGSIZE);
+  ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
   ASSERT (page->frame != NULL);
@@ -636,21 +640,19 @@ load_page (struct page *page, bool write)
   void *kpage = page->frame->address;
 
   if (write) {
-	  // lock_acquire (&filesys_lock);
 	  int tmp = file_write_at (file, kpage, read_bytes, ofs);
-	  // lock_release (&filesys_lock);
 
 	  if (tmp != (int) read_bytes)
 		  return false;
   } else {
-	  // lock_acquire (&filesys_lock);
-	  int tmp = file_read_at (file, kpage, read_bytes, ofs);
-	  // lock_release (&filesys_lock);
+	  if (file) {
+		  int tmp = file_read_at (file, kpage, read_bytes, ofs);
 
-	  if (tmp != (int) read_bytes)
-		return false;
+		  if (tmp != (int) read_bytes)
+			return false;
 
-	  memset (kpage + read_bytes, 0, zero_bytes);
+		  memset (kpage + read_bytes, 0, zero_bytes);
+	  }
 	  if (!install_page (upage, kpage, writable))
 		return false;
   }
@@ -695,7 +697,8 @@ process_mmap (struct file *file, void *address)
 	return mapping;
 }
 
-void process_munmap (int mapping)
+void
+process_munmap (int mapping)
 {
 	uint32_t *pd = thread_current ()->pagedir;
 	struct page *p = vm_find_mmap (mapping);
@@ -706,4 +709,27 @@ void process_munmap (int mapping)
 		vm_free_mmap (p);
 		p = vm_find_mmap (mapping);
 	}
+}
+
+void
+process_swap_out (struct frame *frame)
+{
+	uint32_t *pd = thread_current ()->pagedir;
+	struct page *page = frame->page;
+	ASSERT (page != NULL);
+
+	palloc_free_page (frame->address);
+	pagedir_clear_page (pd, page->address);
+}
+
+bool
+process_swap_in (struct frame *frame)
+{
+	struct page *page = frame->page;
+	ASSERT (page != NULL);
+
+	void *address = palloc_get_page (PAL_USER | PAL_ZERO);
+	frame->address = address;
+
+	return install_page (page->address, frame->address, page->writable);
 }

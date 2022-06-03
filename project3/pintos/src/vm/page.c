@@ -18,7 +18,7 @@ vm_get_page (void *address)
 	if (page == NULL)
 		return page;
 
-	page->address = address;
+	page->address = pg_round_down (address);
 	page->frame = NULL;
 	page->file = NULL;
 	page->ofs = 0;
@@ -29,7 +29,7 @@ vm_get_page (void *address)
 	struct hash *spt = &thread_current ()->spt;
 	ASSERT (spt != NULL);
 
-	if (!vm_spt_insert (spt, page)) {
+	if (!page->address || !vm_spt_insert (spt, page)) {
 		free (page);
 		page = NULL;
 	}
@@ -66,7 +66,6 @@ bool
 vm_spt_insert (struct hash *spt, struct page *page)
 {
 	bool result = hash_insert (spt, &page->sptelem) == NULL ? true : false;
-	// printf("-------------------------vm_spt_insert(): %d\n", result);
 	return result;
 }
 
@@ -76,9 +75,7 @@ vm_spt_find (struct hash *spt, void *address)
 	struct page p;
 	struct hash_elem *e;
 
-	// printf ("-----------------vm_spt_find(): address = %x\n", address);
 	p.address = pg_round_down (address);
-	// printf ("-----------------vm_spt_find(): p.address = %x\n", p.address);
 	e = hash_find (spt, &p.sptelem);
 
 	return e != NULL ? hash_entry (e, struct page, sptelem) : NULL;
@@ -124,9 +121,7 @@ vm_mml_destroy (struct list *mml)
 	e = list_begin (mml);
 	while (e != list_end (mml)) {
 		p = list_entry (e, struct page, mmlelem);
-		// printf ("--------------before vm_free_mmap()\n");
 		process_munmap (p->mapping);
-		// printf ("--------------after vm_free_mmap()\n");
 		e = list_begin (mml);
 	}
 }
@@ -142,13 +137,18 @@ vm_get_mmap (void *address)
 	if (page == NULL)
 		return page;
 
-	page->address = address;
+	page->address = pg_round_down (address);
 	page->frame = NULL;
 	page->file = NULL;
 	page->ofs = 0;
 	page->read_bytes = 0;
 	page->zero_bytes = 0;
 	page->writable = true;
+
+	if (!page->address) {
+		free (page);
+		return NULL;
+	}
 
 	struct list *mml = &thread_current ()->mml;
 	ASSERT (mml != NULL);
@@ -183,7 +183,5 @@ vm_free_mmap (struct page *page)
 
 	vm_free_frame (page->frame);
 	list_remove (&page->mmlelem);
-		// printf ("-------------before vm_free_map()\n");
 	free (page);
-		// printf ("-------------after vm_free_map()\n");
 }

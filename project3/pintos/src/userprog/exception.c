@@ -154,11 +154,15 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  // printf("-------------------page_fault(): at %x\n", fault_addr);
-
   struct page *page = vm_spt_find (&thread_current ()->spt, fault_addr);
-  if (!page)
-	  exit (-1);
+  if (!page) {
+	  if (fault_addr >= f->esp - PGSIZE && fault_addr >= PHYS_BASE - 8*1024*1024) {
+		  page = vm_get_page (fault_addr);
+		   f->esp = pg_round_down (fault_addr);
+	  }
+	  else
+		  exit (-1);
+  }
 
   process_page_fault (page);
 }
