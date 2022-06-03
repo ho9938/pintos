@@ -718,8 +718,8 @@ process_swap_out (struct frame *frame)
 	struct page *page = frame->page;
 	ASSERT (page != NULL);
 
-	palloc_free_page (frame->address);
 	pagedir_clear_page (pd, page->address);
+	palloc_free_page (frame->address);
 }
 
 bool
