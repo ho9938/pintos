@@ -11,10 +11,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#ifdef USERPROG
 #include "userprog/process.h"
-#include "vm/page.h"
-#include "vm/frame.h"
-#include "vm/swap.h"
+#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -93,7 +92,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  vm_ft_init ();
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -300,9 +298,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  struct thread *cur = thread_current ();
-  list_remove (&cur->allelem);
-  cur->status = THREAD_DYING;
+  list_remove (&thread_current()->allelem);
+  thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -491,12 +488,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_status = -1;
   t->exit_status = -1;
   t->load_file = NULL;
-
-  if (t != initial_thread)
-  	vm_spt_init (&t->spt);
-
-  vm_mml_init (&t->mml);
-  t->mapping = 0;
 #endif
 }
 

@@ -69,14 +69,8 @@ syscall_handler (struct intr_frame *f)
 		case SYS_CLOSE:
 			close (get_arg (f, 1));
 			break;
-		case SYS_MMAP:
-			f->eax = mmap (get_arg (f,4), (void *) get_arg (f,5));
-			break;
-		case SYS_MUNMAP:
-			munmap (get_arg (f, 1));
-			break;
 		default:
-			exit (-1);
+			exit(-1);
 			break;
 	}
 }
@@ -257,34 +251,16 @@ close (int fd)
   thread_current()->fdt[fd] = NULL;
 }
 
-int
-mmap (int fd, void *addr)
-{
-	// printf ("----------------------mmap(): addr=%x\n", addr);
-  struct file *target_file = get_file (fd);
-  if (target_file == NULL)
-	  return -1;
-
-  return process_mmap (target_file, addr);
-}
-
-void
-munmap (int mapping)
-{
-  process_munmap (mapping);
-}
-
 /* Check the validity of address */
 static void
 check_address (void *addr)
 {
-  /* Null, not in user space */
-  if (addr == NULL || !is_user_vaddr (addr))
+  /* Null, not in user space, not allocated */
+  if (addr == NULL || !is_user_vaddr (addr) ||
+		  pagedir_get_page (thread_current()->pagedir, addr) == NULL)
+  {
 	  exit(-1);
-  
-  /* Not allocated */
-  if (vm_spt_find (&thread_current ()->spt, addr) == NULL)
-	  exit(-1);
+  }
 }
 
 /* Get INDEXth argument from intr_frame */

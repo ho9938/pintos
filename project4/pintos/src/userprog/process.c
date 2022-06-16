@@ -18,13 +18,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
-#include "vm/frame.h"
-#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static struct thread *child_thread (tid_t tid);
-static bool load_page (struct page *page, bool write);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -148,9 +145,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
-  vm_spt_destroy (&cur->spt);
-  vm_mml_destroy (&cur->mml);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -455,6 +449,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -463,20 +458,30 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-	  struct page *page = vm_get_page (upage);
-	  page->mapping = -1;
+      /* Get a page of memory. */
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if (kpage == NULL)
+        return false;
 
-	  page->file = file;
-	  page->ofs = ofs;
-	  page->read_bytes = page_read_bytes;
-	  page->zero_bytes = page_zero_bytes;
-	  page->writable = writable;
+      /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          palloc_free_page (kpage);
+          return false; 
+        }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable)) 
+        {
+          palloc_free_page (kpage);
+          return false; 
+        }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-	  ofs += PGSIZE;
     }
   return true;
 }
@@ -486,29 +491,18 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  struct frame *kframe;
-  uint8_t *kpage, *upage;
+  uint8_t *kpage;
   bool success = false;
 
-  upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  struct page *page = vm_get_page (upage);
-  
-  struct frame *frame = vm_get_frame (page);
-  if (frame == NULL) {
-	  vm_free_page (page);
-	  return false;
-  }
-  kpage = frame->address;
-
-  success = install_page (upage, kpage, true);
-  if (success)
-	*esp = PHYS_BASE;
-  else {
-	  vm_free_page (page);
-	  vm_free_frame (frame);
-	  return false;
-  }
-
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL) 
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else
+        palloc_free_page (kpage);
+    }
   return success;
 }
 
@@ -578,32 +572,6 @@ push_argument (int argc, char **argv, void **esp_ptr)
 	memset (*esp_ptr, 0, 4);
 }
 
-bool 
-process_page_fault (struct page *page)
-{
-	
-	/* frame swapped out */
-	if (page->frame != NULL) {
-		vm_swap_out (vm_ft_victim ());
-		return vm_swap_in (page->frame);
-	}
-
-	/* new frame needed */
-	struct frame *frame = vm_get_frame (page);
-
-	if (!frame)
-		return false;
-
-	page->frame = frame;
-
-	if (!load_page (page, false)) {
-		vm_free_frame (frame);
-		return false;
-	}
-
-	return true;
-}
-
 /* return child thread discriptor with tid */
 static struct thread *
 child_thread (tid_t tid)
@@ -620,116 +588,4 @@ child_thread (tid_t tid)
 	}
 
 	return NULL;
-}
-
-static bool
-load_page (struct page *page, bool write)
-{
-  struct file *file = page->file;
-  off_t ofs = page->ofs;
-  void *upage = page->address;
-  uint32_t read_bytes = page->read_bytes;
-  uint32_t zero_bytes = page->zero_bytes;
-  bool writable = page->writable;
-
-  ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
-  ASSERT (pg_ofs (upage) == 0);
-  ASSERT (ofs % PGSIZE == 0);
-  ASSERT (page->frame != NULL);
-
-  void *kpage = page->frame->address;
-
-  if (write) {
-	  int tmp = file_write_at (file, kpage, read_bytes, ofs);
-
-	  if (tmp != (int) read_bytes)
-		  return false;
-  } else {
-	  if (file) {
-		  int tmp = file_read_at (file, kpage, read_bytes, ofs);
-
-		  if (tmp != (int) read_bytes)
-			return false;
-
-		  memset (kpage + read_bytes, 0, zero_bytes);
-	  }
-	  if (!install_page (upage, kpage, writable))
-		return false;
-  }
-
-  return true;
-}
-
-int
-process_mmap (struct file *file, void *address)
-{
-	int mapping = (thread_current ()->mapping)++;
-	off_t ofs = 0;
-	off_t read_bytes = file_length (file);
-
-	while (read_bytes > 0) {
-		off_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-		off_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-		struct page *page = vm_get_mmap (address);
-		if (!page) {
-			process_munmap (mapping);
-			return -1;
-		}
-
-		page->mapping = mapping;
-
-		page->file = file;
-		page->ofs = ofs;
-		page->read_bytes = page_read_bytes;
-		page->zero_bytes = page_zero_bytes;
-
-		read_bytes -= page_read_bytes;
-		address += PGSIZE;
-		ofs += PGSIZE;
-
-		if (!process_page_fault (page)) {
-			process_munmap (mapping);
-			return -1;
-		}
-	}
-
-	return mapping;
-}
-
-void
-process_munmap (int mapping)
-{
-	uint32_t *pd = thread_current ()->pagedir;
-	struct page *p = vm_find_mmap (mapping);
-	while (p != NULL) {
-		if (pagedir_is_dirty (pd, p->address))
-			load_page (p, true);
-		pagedir_clear_page (pd, p->address);
-		vm_free_mmap (p);
-		p = vm_find_mmap (mapping);
-	}
-}
-
-void
-process_swap_out (struct frame *frame)
-{
-	uint32_t *pd = thread_current ()->pagedir;
-	struct page *page = frame->page;
-	ASSERT (page != NULL);
-
-	pagedir_clear_page (pd, page->address);
-	palloc_free_page (frame->address);
-}
-
-bool
-process_swap_in (struct frame *frame)
-{
-	struct page *page = frame->page;
-	ASSERT (page != NULL);
-
-	void *address = palloc_get_page (PAL_USER | PAL_ZERO);
-	frame->address = address;
-
-	return install_page (page->address, frame->address, page->writable);
 }

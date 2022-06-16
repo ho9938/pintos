@@ -4,7 +4,6 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include <hash.h>
 #include "threads/synch.h"
 
 /* States in a thread's life cycle. */
@@ -110,10 +109,6 @@ struct thread
 	int load_status;					/* Load status */
 	int exit_status;					/* Exit status */
 	struct file *load_file;				/* File discriptor for loaded file */
-
-	struct hash spt;					/* Supplemental page table */
-	struct list mml;					/* memory mapped list */
-	int mapping;						/* latedst mapping */
 #endif
 
     /* Owned by thread.c. */

@@ -19,9 +19,6 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 
-int mmap (int fd, void *addr);
-void munmap (int mapping);
-
 /* Lock for file system synchronization */
 struct lock filesys_lock;
 
