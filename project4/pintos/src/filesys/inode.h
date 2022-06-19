@@ -5,6 +5,8 @@
 #include "filesys/off_t.h"
 #include "devices/block.h"
 
+#define BLOCK_TABLE_SIZE ( BLOCK_SECTOR_SIZE / sizeof (block_sector_t) )
+
 struct bitmap;
 
 void inode_init (void);

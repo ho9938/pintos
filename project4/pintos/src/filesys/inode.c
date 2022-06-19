@@ -14,11 +14,16 @@
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    block_sector_t table_one;           /* table sector. */
+	uint32_t unused[125];               /* Not used. */
   };
+
+struct inode_table_disk
+{
+	block_sector_t table_two[BLOCK_TABLE_SIZE];		/* table for blocks */
+};
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -26,6 +31,20 @@ static inline size_t
 bytes_to_sectors (off_t size)
 {
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
+}
+
+static inline int
+pos_to_index_one (off_t pos)
+{
+	int ret = pos / (BLOCK_SECTOR_SIZE * BLOCK_TABLE_SIZE);
+	return ret;
+}
+
+static inline int
+pos_to_index_two (off_t pos)
+{
+	int ret = (pos % (BLOCK_SECTOR_SIZE * BLOCK_TABLE_SIZE)) / BLOCK_SECTOR_SIZE;
+	return ret;
 }
 
 /* In-memory inode. */
