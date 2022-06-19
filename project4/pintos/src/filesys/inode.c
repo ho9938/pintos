@@ -156,23 +156,26 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start)) 
-        {
-          block_write (fs_device, sector, disk_inode);
-          if (sectors > 0) 
-            {
-              static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
-              
-              for (i = 0; i < sectors; i++) 
-                block_write (fs_device, disk_inode->start + i, zeros);
-            }
-          success = true; 
-        } 
+
+	  block_sector_t cur_sector;
+
+	  if (free_map_allocate (1, &cur_sector)) {
+		  disk_inode->table_one = cur_sector;
+
+		  static char zeros[BLOCK_SECTOR_SIZE];
+		  block_write (fs_device, cur_sector, zeros);
+	  }
+	  else
+	  {
+		  free (disk_inode);
+		  return false;
+	  }
+
+	  block_write (fs_device, sector, disk_inode);
       free (disk_inode);
+	  success = true;
     }
   return success;
 }
@@ -249,9 +252,41 @@ inode_close (struct inode *inode)
       if (inode->removed) 
         {
           free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
-        }
+
+		  block_sector_t cur_sector;
+		  struct inode_table_disk *inode_table_one = NULL;
+		  inode_table_one = calloc (1, sizeof *inode_table_one);
+		  struct inode_table_disk *inode_table_two = NULL;
+		  inode_table_two = calloc (1, sizeof *inode_table_two);
+
+		  cur_sector = inode->data.table_one;
+		  if (cur_sector == 0) {
+			  free (inode);
+			  free (inode_table_one);
+			  free (inode_table_two);
+			  return;
+		  }
+		  free_map_release (cur_sector, 1);
+		  block_read (fs_device, cur_sector, inode_table_one);
+
+		  unsigned index1, index2;
+		  for (index1 = 0; index1 < BLOCK_TABLE_SIZE; index1++) {
+			  cur_sector = inode_table_one->table_two[index1];
+			  if (cur_sector == 0)
+				  continue;
+			  free_map_release (cur_sector, 1);
+			  block_read (fs_device, cur_sector, inode_table_two);
+
+			  for (index2 = 0; index2 < BLOCK_TABLE_SIZE; index2++) {
+				  cur_sector = inode_table_two->table_two[index2];
+				  if (cur_sector != 0)
+					  free_map_release (cur_sector, 1);
+			  }
+		  }
+
+		  free (inode_table_one);
+		  free (inode_table_two);
+		}
 
       free (inode); 
     }
