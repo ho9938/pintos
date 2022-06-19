@@ -63,13 +63,66 @@ struct inode
    Returns -1 if INODE does not contain data for a byte at offset
    POS. */
 static block_sector_t
-byte_to_sector (const struct inode *inode, off_t pos) 
+byte_to_sector (const struct inode *inode, off_t pos, bool write) 
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  else
+  if (pos > inode->data.length)
     return -1;
+
+  if (inode->sector == FREE_MAP_SECTOR)
+	  return inode->data.table_one;
+  
+  /* else */
+  struct inode_table_disk *inode_table = NULL;
+  inode_table = calloc (1, sizeof *inode_table);
+
+  if (inode_table != NULL)
+    {
+		block_sector_t cur_sector, prev_sector;
+		static char zeros[BLOCK_SECTOR_SIZE];
+
+		cur_sector = inode->data.table_one;
+		ASSERT (cur_sector != 0);
+		block_read (fs_device, cur_sector, inode_table);
+		
+		prev_sector = cur_sector;
+		cur_sector = inode_table->table_two[pos_to_index_one (pos)];
+		if (cur_sector == 0) {
+			if (!write)
+				goto fail;
+			/* else */
+			if (free_map_allocate (1, &cur_sector)) {
+				inode_table->table_two[pos_to_index_one (pos)] = cur_sector;
+				block_write (fs_device, prev_sector, inode_table);
+				block_write (fs_device, cur_sector, zeros);
+			}
+			else
+				goto fail;
+		}
+		block_read (fs_device, cur_sector, inode_table);
+
+		prev_sector = cur_sector;
+		cur_sector = inode_table->table_two[pos_to_index_two (pos)];
+		if (cur_sector == 0) {
+			if (!write)
+				goto fail;
+			/* else */
+			if (free_map_allocate (1, &cur_sector)) {
+				inode_table->table_two[pos_to_index_two (pos)] = cur_sector;
+				block_write (fs_device, prev_sector, inode_table);
+				block_write (fs_device, cur_sector, zeros);
+			}
+			else
+				goto fail;
+		}
+	  
+		free (inode_table);
+		return cur_sector;
+	}
+
+	fail:
+		free (inode_table);
+		return -1;
 }
 
 /* List of open inodes, so that opening a single inode twice
